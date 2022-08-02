@@ -24,10 +24,9 @@ class TestSecretStore(unittest.TestCase):
 	
 	def get_response(self, req):
 		self.s.sendall(req)
-		data = self.s.recv(max_resp_size)
 		#print 'Sent', repr(req)
 		#print 'Recv', repr(data), "\n"
-		return data
+		return self.s.recv(max_resp_size)
 
 	def assertValidBase64(self, req):
 		return True #TODO
@@ -39,15 +38,12 @@ class TestSecretStore(unittest.TestCase):
 		return self.assertTrue("error:" in response and errormsg in response, errormsg)
 	
 	def getNewline(self):
-		if random.randint(0,1):
-			return "\r\n"
-		else:
-			return "\n"
+		return "\r\n" if random.randint(0,1) else "\n"
 
 	def test_create_secret_get_secret(self):
 		new_secret_max=100
 		num_iterations=100
-		for i in range(0, num_iterations): 
+		for _ in range(num_iterations):
 			for requested_secret_len in range(1, new_secret_max):
 				key_resp=self.get_response("%d%s" % (requested_secret_len, self.getNewline()))[:-2]
 				key_resp_len=len(key_resp)
@@ -55,14 +51,14 @@ class TestSecretStore(unittest.TestCase):
 				self.assertNoError(key_resp)
 				self.assertValidBase64(key_resp)
 				self.assertEquals(key_resp_len, expected_b64_key_size_bytes)
-				
+
 				bin_key=base64.b64decode(key_resp)
 				self.assertEquals(len(bin_key), expected_bin_key_size_bytes)
-				
-				secret_resp=self.get_response("%s%s" % (key_resp, self.getNewline()))[:-2]
+
+				secret_resp = self.get_response(f"{key_resp}{self.getNewline()}")[:-2]
 				self.assertNoError(secret_resp)
 				self.assertValidBase64(secret_resp)
-			
+
 				bin_secret=base64.b64decode(secret_resp)
 				self.assertEquals(len(bin_secret), requested_secret_len)
 	
@@ -106,7 +102,7 @@ class TestSecretStore(unittest.TestCase):
 		# TODO assert
 
 	def test_fuzz_large_commands(self):
-		for x in range(0,11):
+		for x in range(11):
 			#send exponetually larger strings.
 			resp=self.get_response("A"*(2^x)+"\n")
 			#make sure we have some kind of response. 
@@ -115,21 +111,21 @@ class TestSecretStore(unittest.TestCase):
 	def test_invalid_chars(self):
 		requested_secret_len=128
 		key_resp=self.get_response("%d\n" % (requested_secret_len))[:-2]
-		
+
 		# prepend fuzzed char to the key request
-		for char_i in range(0,128):
+		for char_i in range(128):
 			resp=self.get_response("%s%s\n" % (chr(char_i), key_resp))
 			#self.assertError(key_resp, "key not found during lookup: '%s'" % resp)
 			self.assertRegexpMatches(resp, "\n$","incomplete response: '%s'" % str(resp))
-		
+
 		# append fuzzed char to the key request
-		for char_i in range(0,128):
+		for char_i in range(128):
 			resp=self.get_response("%s%s\n" % (key_resp, chr(char_i)))
 			#self.assertError(resp, "key not found during lookup: '%s'" % resp)
 			self.assertRegexpMatches(resp, "\n$","incomplete response: '%s'" % str(resp))
-		
+
 		# just the char by itself
-		for char_i in range(0,128):
+		for char_i in range(128):
 			resp=self.get_response("%s\n" % (chr(char_i)))
 			self.assertRegexpMatches(resp, "\n$","incomplete response: '%s'" % str(resp))	
 		

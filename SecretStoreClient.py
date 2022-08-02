@@ -22,12 +22,10 @@ class SecretStoreClient:
 	def get_response(self, req):
 		self.s.sendall(req)
 		data = self.s.recv(self.max_resp_size)
-		print 'Sent', repr(req)
-		print 'Recv', repr(data), "\n"
+		self.s.sendall(req)
+		self.s.sendall(req)
 		self.check_error(data)
-		if "\r\n" in data:
-			return data[:-2]
-		return data
+		return data[:-2] if "\r\n" in data else data
 		
 	def new_secret(self, size):
 		return self.get_response("%d\r\n" % size)
